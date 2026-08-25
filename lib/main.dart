@@ -8,7 +8,7 @@ void main() async {
 
   // 1. CONNEXION SÉCURISÉE À VOTRE BASE DE DONNÉES SUPABASE AVEC VOS CLÉS MAKBINE
   await Supabase.initialize(
-    url: 'https://supabase.co', 
+    url: 'https://vxaglbaqfpxitbdimeqj.supabase.co', 
     anonKey: 'sb_publishable_otC4yztme4tqkL9BA8FM5Q_APYQrtGg', 
   );
 
