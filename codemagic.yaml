@@ -1,7 +1,7 @@
 publishing:
   email:
     recipients:
-      - ossohouangestevieclotaire@gmail.com # ⚠️ Remplacez par votre vrai e-mail pour recevoir l'application
+      - ossohouangestevieclotaire@gmail.com
 
 workflows:
   android-workflow:
@@ -18,9 +18,11 @@ workflows:
         script: | 
           flutter channel stable
           flutter upgrade
+      - name: Génération des fichiers Android manquants
+        script: |
+          flutter create --platforms=android .
       - name: Fabrication du fichier APK
         script: | 
           flutter build apk --release
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
-
