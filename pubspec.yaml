@@ -1,1 +1,20 @@
+name: makbine_transfert
+description: Application de transfert automatique pour makbine.ci
+version: 1.0.0+1
+
+environment:
+  sdk: '^3.13.0' # 🎛️ La ligne manquante qui corrige votre erreur Codemagic !
+
+dependencies:
+  flutter:
+    sdk: flutter
+  supabase_flutter: ^2.0.0
+  url_launcher: ^6.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
 
