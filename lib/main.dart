@@ -150,7 +150,7 @@ class _RobotTransfertScreenState extends State<RobotTransfertScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(8),
-                boxShadow: [BoxShadow(color: Colors.black10, blurRadius: 4)],
+                boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
