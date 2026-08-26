@@ -15,14 +15,19 @@ workflows:
         - push
     scripts:
       - name: Préparation de Flutter
-        script: | 
+        script: |
           flutter channel stable
           flutter upgrade
       - name: Génération des fichiers Android manquants
         script: |
           flutter create --platforms=android .
+      - name: Vérification du package généré
+        script: |
+          echo "----- applicationId réellement utilisé -----"
+          cat android/app/build.gradle | grep applicationId
       - name: Fabrication du fichier APK
-        script: | 
+        script: |
+          flutter pub get
           flutter build apk --release
     artifacts:
       - build/app/outputs/flutter-apk/app-release.apk
