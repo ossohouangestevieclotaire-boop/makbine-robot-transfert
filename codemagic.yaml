@@ -18,13 +18,24 @@ workflows:
         script: |
           flutter channel stable
           flutter upgrade
-      - name: Génération des fichiers Android manquants
+      - name: Génération complète du dossier Android
         script: |
+          rm -rf android
           flutter create --platforms=android .
+      - name: Application de nos fichiers personnalisés
+        script: |
+          cp -f android_custom/AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+          mkdir -p android/app/src/main/kotlin/com/example/makbine_transfert
+          cp -f android_custom/kotlin/com/example/makbine_transfert/MainActivity.kt android/app/src/main/kotlin/com/example/makbine_transfert/MainActivity.kt
+          cp -f android_custom/kotlin/com/example/makbine_transfert/UssdAutomationService.kt android/app/src/main/kotlin/com/example/makbine_transfert/UssdAutomationService.kt
+          mkdir -p android/app/src/main/res/xml
+          cp -f android_custom/res/xml/accessibility_service_config.xml android/app/src/main/res/xml/accessibility_service_config.xml
+          mkdir -p android/app/src/main/res/values
+          cp -f android_custom/res/values/accessibility_strings.xml android/app/src/main/res/values/accessibility_strings.xml
       - name: Vérification du package généré
         script: |
           echo "----- applicationId réellement utilisé -----"
-          cat android/app/build.gradle | grep applicationId
+          cat android/app/build.gradle | grep applicationId || cat android/app/build.gradle.kts | grep applicationId
       - name: Fabrication du fichier APK
         script: |
           flutter pub get
