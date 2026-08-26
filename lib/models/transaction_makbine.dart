@@ -1,14 +1,14 @@
 class TransactionMakbine {
   final String id;
   final String destPhone;
-  final String montantForfait;
-  final String reseau; // 'MTN', 'ORANGE', 'MOOV', 'WAVE'...
+  final String montant;
+  final String reseau; // vient de la colonne "service" (MTN, ORANGE...)
   final String status;
 
   TransactionMakbine({
     required this.id,
     required this.destPhone,
-    required this.montantForfait,
+    required this.montant,
     required this.reseau,
     required this.status,
   });
@@ -17,8 +17,8 @@ class TransactionMakbine {
     return TransactionMakbine(
       id: map['id'].toString(),
       destPhone: map['dest_phone'].toString(),
-      montantForfait: map['montant_forfait'].toString(),
-      reseau: (map['reseau'] ?? 'MTN').toString().toUpperCase(),
+      montant: map['amount'].toString(),
+      reseau: (map['service'] ?? 'MTN').toString().toUpperCase(),
       status: map['status'].toString(),
     );
   }
