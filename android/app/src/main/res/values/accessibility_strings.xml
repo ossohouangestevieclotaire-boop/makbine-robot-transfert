@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="accessibility_service_description">
-        Permet à Makbine de remplir automatiquement les écrans de menu USSD
-        (numéro et montant) pour accélérer les transferts. Le code secret
-        n\'est jamais lu ni saisi par ce service.
-    </string>
-</resources>
