@@ -74,7 +74,7 @@ class _RobotTransfertScreenState extends State<RobotTransfertScreen> {
       }
 
       ajouterLog(
-          "🔥 COMMANDE DÉTECTÉE ! Client: ${commande.destPhone} | ${commande.reseau} | ${commande.montantForfait} F");
+          "🔥 COMMANDE DÉTECTÉE ! Client: ${commande.destPhone} | ${commande.reseau} | ${commande.montant} F");
 
       final operateur = obtenirOperateur(commande.reseau);
       if (operateur == null) {
@@ -104,18 +104,18 @@ class _RobotTransfertScreenState extends State<RobotTransfertScreen> {
 
     if (commande.reseau == 'MTN') {
       ajouterLog(
-          "🤖 Automatisation MTN lancée pour ${commande.destPhone} (${commande.montantForfait} F).");
+          "🤖 Automatisation MTN lancée pour ${commande.destPhone} (${commande.montant} F).");
       ajouterLog("👉 Une notification vous demandera le code secret dans quelques secondes.");
       await UssdAutomationChannel.demarrerTransfertMtn(
         numero: commande.destPhone,
-        montant: commande.montantForfait,
+        montant: commande.montant,
       );
       setState(() => _idEnAttenteConfirmation = commande.id);
       return;
     }
 
     final codeUssd =
-        operateur.construireCodeUssd(commande.destPhone, commande.montantForfait);
+        operateur.construireCodeUssd(commande.destPhone, commande.montant);
     final url = Uri.parse('tel:${Uri.encodeComponent(codeUssd)}');
 
     if (await canLaunchUrl(url)) {
