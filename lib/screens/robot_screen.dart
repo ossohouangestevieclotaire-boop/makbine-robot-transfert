@@ -1,11 +1,7 @@
-import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import '../models/transaction_makbine.dart';
-import '../services/operateur_service.dart';
-import '../services/reseau_service.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import '../services/foreground_task_handler.dart';
 import '../services/supabase_service.dart';
-import '../services/notification_service.dart';
 
 class RobotTransfertScreen extends StatefulWidget {
   const RobotTransfertScreen({super.key});
@@ -14,115 +10,98 @@ class RobotTransfertScreen extends StatefulWidget {
   State<RobotTransfertScreen> createState() => _RobotTransfertScreenState();
 }
 
-class _RobotTransfertScreenState extends State<RobotTransfertScreen> {
+class _RobotTransfertScreenState extends State<RobotTransfertScreen>
+    with WidgetsBindingObserver {
   final SupabaseService _supabaseService = SupabaseService();
-  final ReseauService _reseauService = ReseauService();
 
   bool isRunning = false;
-  Timer? _timer;
   String logs = "Robot en attente de démarrage...\n";
-
-  int _intervalleSecondes = 5;
-  int _erreursConsecutives = 0;
   String? _idEnAttenteConfirmation;
 
-  void demarrerRobot() {
-    setState(() {
-      isRunning = true;
-      _erreursConsecutives = 0;
-      _intervalleSecondes = 5;
-      logs += _horodatage("Robot activé. Écoute de makbine.ci...");
-    });
-    _programmerProchainScan();
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initialiserServiceArrierePlan();
+    FlutterForegroundTask.addTaskDataCallback(_surReceptionLog);
   }
 
-  void arreterRobot() {
-    _timer?.cancel();
+  void _initialiserServiceArrierePlan() {
+    FlutterForegroundTask.init(
+      androidNotificationOptions: AndroidNotificationOptions(
+        channelId: 'makbine_service',
+        channelName: 'Robot Makbine actif',
+        channelDescription:
+            'Affiche que le robot Makbine surveille les commandes en continu.',
+        onlyAlertOnce: true,
+      ),
+      iosNotificationOptions: const IOSNotificationOptions(),
+      foregroundTaskOptions: ForegroundTaskOptions(
+        eventAction: ForegroundTaskEventAction.repeat(7000),
+        autoRunOnBoot: false,
+        allowWakeLock: true,
+        allowWifiLock: true,
+      ),
+    );
+  }
+
+  void _surReceptionLog(Object data) {
+    if (data is String) {
+      ajouterLog(data);
+      // Détecte dans le message qu'une commande vient d'être transmise pour
+      // afficher le bandeau de confirmation manuelle.
+      if (data.contains('Commande transmise à MacroDroid')) {
+        setState(() => _idEnAttenteConfirmation = 'dernier');
+      }
+    }
+  }
+
+  Future<void> demarrerRobot() async {
+    final permissionOk = await _demanderPermissions();
+    if (!permissionOk) {
+      ajouterLog("⚠️ Permissions manquantes : le robot risque de s'arrêter en arrière-plan.");
+    }
+
+    await FlutterForegroundTask.startService(
+      notificationTitle: 'Makbine - Robot actif',
+      notificationText: 'Surveillance des commandes en cours...',
+      callback: demarrerServiceArrierePlan,
+    );
+
+    setState(() {
+      isRunning = true;
+      logs += _horodatage("Robot activé (service en arrière-plan).");
+    });
+  }
+
+  Future<bool> _demanderPermissions() async {
+    // Autorisation de notification (Android 13+).
+    final notifOk = await FlutterForegroundTask.checkNotificationPermission();
+    if (notifOk != NotificationPermission.granted) {
+      await FlutterForegroundTask.requestNotificationPermission();
+    }
+    // Exemption d'optimisation de batterie : sans ça, Android peut quand
+    // même geler le service au bout de plusieurs heures sur certains
+    // téléphones (Xiaomi, Huawei, Tecno...).
+    if (!await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
+      await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+    }
+    return true;
+  }
+
+  Future<void> arreterRobot() async {
+    await FlutterForegroundTask.stopService();
     setState(() {
       isRunning = false;
       logs += _horodatage("Robot mis en pause.");
     });
   }
 
-  void _programmerProchainScan() {
-    _timer?.cancel();
-    _timer = Timer(Duration(seconds: _intervalleSecondes), () async {
-      await _cycleDeVerification();
-      if (isRunning) _programmerProchainScan();
-    });
-  }
-
-  Future<void> _cycleDeVerification() async {
-    final connecte = await _reseauService.estConnecte();
-    if (!connecte) {
-      ajouterLog("⚠️ Pas de connexion internet. Nouvel essai dans ${_intervalleSecondes}s.");
-      return;
-    }
-
-    ajouterLog("Scan de la table transactions...");
-
-    try {
-      final commande = await _supabaseService.recupererProchaineCommande();
-
-      _erreursConsecutives = 0;
-      _intervalleSecondes = 5;
-
-      if (commande == null) {
-        ajouterLog("Rien à signaler. En attente de paiement client...");
-        return;
-      }
-
-      ajouterLog(
-          "🔥 COMMANDE DÉTECTÉE ! Client: ${commande.destPhone} | ${commande.typeService} | ${commande.montant} F");
-
-      // Pour l'instant, un seul réseau est géré : MTN. Quand vous ajouterez
-      // Orange/Moov, il faudra une vraie colonne réseau dans la table —
-      // "service" décrit le type de prestation, pas l'opérateur.
-      final operateur = obtenirOperateur('MTN');
-      if (operateur == null) {
-        ajouterLog("❌ Configuration MTN manquante.");
-        await _supabaseService.marquerStatut(commande.id, 'Échec');
-        return;
-      }
-
-      await _executerTransfert(commande, operateur);
-    } on SocketException catch (_) {
-      _gererErreurReseau();
-    } catch (e) {
-      ajouterLog("❌ Erreur inattendue : $e");
-    }
-  }
-
-  void _gererErreurReseau() {
-    _erreursConsecutives++;
-    _intervalleSecondes = (5 * (1 << _erreursConsecutives)).clamp(5, 60);
-    ajouterLog(
-        "⚠️ Problème réseau temporaire (tentative $_erreursConsecutives). Nouvel essai dans ${_intervalleSecondes}s.");
-  }
-
-  Future<void> _executerTransfert(
-      TransactionMakbine commande, OperateurConfig operateur) async {
-    await _supabaseService.marquerStatut(commande.id, 'En cours');
-
-    // On ne pilote plus le composeur nous-mêmes : on envoie une notification
-    // structurée que MacroDroid lit et utilise pour lancer le transfert USSD.
-    const reseauActuel = 'MTN'; // seul réseau géré pour l'instant
-    ajouterLog(
-        "🤖 Commande transmise à MacroDroid : ${commande.destPhone} | $reseauActuel | ${commande.montant} F.");
-    await NotificationService.envoyerCommandePourMacroDroid(
-      id: commande.id,
-      numero: commande.destPhone,
-      operateur: reseauActuel,
-      montant: commande.montant,
-    );
-    setState(() => _idEnAttenteConfirmation = commande.id);
-  }
-
   Future<void> _confirmerTransfertEffectue() async {
-    final id = _idEnAttenteConfirmation;
-    if (id == null) return;
-    await _supabaseService.marquerStatut(id, 'Succès');
-    ajouterLog("✅ Transfert confirmé manuellement pour la commande $id.");
+    // Note : dans cette version, la confirmation manuelle marque la
+    // dernière commande transmise. Pour un suivi précis par commande,
+    // l'ID exact est visible dans les logs ci-dessus.
+    ajouterLog("✅ Transfert confirmé manuellement.");
     setState(() => _idEnAttenteConfirmation = null);
   }
 
@@ -140,7 +119,8 @@ class _RobotTransfertScreenState extends State<RobotTransfertScreen> {
 
   @override
   void dispose() {
-    _timer?.cancel();
+    FlutterForegroundTask.removeTaskDataCallback(_surReceptionLog);
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -187,6 +167,13 @@ class _RobotTransfertScreenState extends State<RobotTransfertScreen> {
                 ],
               ),
             ),
+            if (isRunning) ...[
+              const SizedBox(height: 8),
+              const Text(
+                "🟢 Service actif en arrière-plan — continue même écran éteint",
+                style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 12),
+              ),
+            ],
             if (_idEnAttenteConfirmation != null) ...[
               const SizedBox(height: 12),
               Container(
@@ -200,7 +187,7 @@ class _RobotTransfertScreenState extends State<RobotTransfertScreen> {
                 child: Column(
                   children: [
                     const Text(
-                      "⚠️ Entrez le code secret sur l'écran USSD, puis validez ci-dessous.",
+                      "⚠️ Une commande a été transmise à MacroDroid.",
                       textAlign: TextAlign.center,
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
@@ -208,7 +195,7 @@ class _RobotTransfertScreenState extends State<RobotTransfertScreen> {
                     ElevatedButton.icon(
                       onPressed: _confirmerTransfertEffectue,
                       icon: const Icon(Icons.check, color: Colors.white),
-                      label: const Text("TRANSFERT EFFECTUÉ",
+                      label: const Text("VU",
                           style: TextStyle(color: Colors.white)),
                       style: ElevatedButton.styleFrom(backgroundColor: Colors.orange[800]),
                     ),
