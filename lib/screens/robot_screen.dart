@@ -74,11 +74,14 @@ class _RobotTransfertScreenState extends State<RobotTransfertScreen> {
       }
 
       ajouterLog(
-          "🔥 COMMANDE DÉTECTÉE ! Client: ${commande.destPhone} | ${commande.reseau} | ${commande.montant} F");
+          "🔥 COMMANDE DÉTECTÉE ! Client: ${commande.destPhone} | ${commande.typeService} | ${commande.montant} F");
 
-      final operateur = obtenirOperateur(commande.reseau);
+      // Pour l'instant, un seul réseau est géré : MTN. Quand vous ajouterez
+      // Orange/Moov, il faudra une vraie colonne réseau dans la table —
+      // "service" décrit le type de prestation, pas l'opérateur.
+      final operateur = obtenirOperateur('MTN');
       if (operateur == null) {
-        ajouterLog("❌ Réseau '${commande.reseau}' pas encore pris en charge.");
+        ajouterLog("❌ Configuration MTN manquante.");
         await _supabaseService.marquerStatut(commande.id, 'Échec');
         return;
       }
@@ -102,7 +105,8 @@ class _RobotTransfertScreenState extends State<RobotTransfertScreen> {
       TransactionMakbine commande, OperateurConfig operateur) async {
     await _supabaseService.marquerStatut(commande.id, 'En cours');
 
-    if (commande.reseau == 'MTN') {
+    // Un seul réseau géré pour l'instant : MTN.
+    if (true) {
       ajouterLog(
           "🤖 Automatisation MTN lancée pour ${commande.destPhone} (${commande.montant} F).");
       ajouterLog("👉 Une notification vous demandera le code secret dans quelques secondes.");
@@ -131,7 +135,7 @@ class _RobotTransfertScreenState extends State<RobotTransfertScreen> {
   Future<void> _confirmerTransfertEffectue() async {
     final id = _idEnAttenteConfirmation;
     if (id == null) return;
-    await _supabaseService.marquerStatut(id, 'Terminé');
+    await _supabaseService.marquerStatut(id, 'Succès');
     ajouterLog("✅ Transfert confirmé manuellement pour la commande $id.");
     setState(() => _idEnAttenteConfirmation = null);
   }
