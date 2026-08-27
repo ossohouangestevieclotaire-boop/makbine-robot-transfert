@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'screens/robot_screen.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -9,6 +10,8 @@ void main() async {
     url: 'https://vxaqlbaqfpxitbdimeqj.supabase.co',
     anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4YXFsYmFxZnB4aXRiZGltZXFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyNjQ3NjAsImV4cCI6MjEwMTg0MDc2MH0.izqAjAoKSz_ecnuppy1XEcJWcsvDc-wwoJqdUR8coDI',
   );
+
+  await NotificationService.initialiser();
 
   runApp(const MyApp());
 }
