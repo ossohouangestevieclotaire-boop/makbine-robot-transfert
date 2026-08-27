@@ -34,18 +34,35 @@ workflows:
           cp -f android_custom/res/values/accessibility_strings.xml android/app/src/main/res/values/accessibility_strings.xml
       - name: Activer le core library desugaring (requis par flutter_local_notifications)
         script: |
-          sed -i '' '/compileOptions {/a\
-                  coreLibraryDesugaringEnabled true
-          ' android/app/build.gradle
-          sed -i '' '/dependencies {/a\
-              coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"
-          ' android/app/build.gradle
-          echo "----- build.gradle après modification -----"
-          cat android/app/build.gradle
+          if [ -f android/app/build.gradle.kts ]; then
+            echo "Format détecté : build.gradle.kts (Kotlin DSL)"
+            sed -i '' '/compileOptions {/a\
+                    isCoreLibraryDesugaringEnabled = true
+            ' android/app/build.gradle.kts
+            sed -i '' '/dependencies {/a\
+                coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+            ' android/app/build.gradle.kts
+            echo "----- build.gradle.kts après modification -----"
+            cat android/app/build.gradle.kts
+          else
+            echo "Format détecté : build.gradle (Groovy)"
+            sed -i '' '/compileOptions {/a\
+                    coreLibraryDesugaringEnabled true
+            ' android/app/build.gradle
+            sed -i '' '/dependencies {/a\
+                coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"
+            ' android/app/build.gradle
+            echo "----- build.gradle après modification -----"
+            cat android/app/build.gradle
+          fi
       - name: Vérification du package généré
         script: |
           echo "----- applicationId réellement utilisé -----"
-          cat android/app/build.gradle | grep applicationId || cat android/app/build.gradle.kts | grep applicationId
+          if [ -f android/app/build.gradle.kts ]; then
+            grep applicationId android/app/build.gradle.kts
+          else
+            grep applicationId android/app/build.gradle
+          fi
       - name: Fabrication du fichier APK
         script: |
           flutter pub get
