@@ -32,6 +32,16 @@ workflows:
           cp -f android_custom/res/xml/accessibility_service_config.xml android/app/src/main/res/xml/accessibility_service_config.xml
           mkdir -p android/app/src/main/res/values
           cp -f android_custom/res/values/accessibility_strings.xml android/app/src/main/res/values/accessibility_strings.xml
+      - name: Activer le core library desugaring (requis par flutter_local_notifications)
+        script: |
+          sed -i '' '/compileOptions {/a\
+                  coreLibraryDesugaringEnabled true
+          ' android/app/build.gradle
+          sed -i '' '/dependencies {/a\
+              coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"
+          ' android/app/build.gradle
+          echo "----- build.gradle après modification -----"
+          cat android/app/build.gradle
       - name: Vérification du package généré
         script: |
           echo "----- applicationId réellement utilisé -----"
