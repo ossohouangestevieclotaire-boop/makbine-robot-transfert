@@ -13,6 +13,13 @@ class NotificationService {
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const settings = InitializationSettings(android: androidSettings);
     await _plugin.initialize(settings);
+
+    // Depuis Android 13, il faut demander explicitement l'autorisation
+    // d'afficher des notifications, sinon elles restent invisibles sans
+    // aucune erreur.
+    final androidImpl = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await androidImpl?.requestNotificationsPermission();
   }
 
   static Future<void> envoyerCommandePourMacroDroid({
