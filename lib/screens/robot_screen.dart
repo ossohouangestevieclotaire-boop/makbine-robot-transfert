@@ -1,12 +1,11 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../models/transaction_makbine.dart';
 import '../services/operateur_service.dart';
 import '../services/reseau_service.dart';
 import '../services/supabase_service.dart';
-import '../services/ussd_automation_channel.dart';
+import '../services/notification_service.dart';
 
 class RobotTransfertScreen extends StatefulWidget {
   const RobotTransfertScreen({super.key});
@@ -105,31 +104,18 @@ class _RobotTransfertScreenState extends State<RobotTransfertScreen> {
       TransactionMakbine commande, OperateurConfig operateur) async {
     await _supabaseService.marquerStatut(commande.id, 'En cours');
 
-    // Un seul réseau géré pour l'instant : MTN.
-    if (true) {
-      ajouterLog(
-          "🤖 Automatisation MTN lancée pour ${commande.destPhone} (${commande.montant} F).");
-      ajouterLog("👉 Une notification vous demandera le code secret dans quelques secondes.");
-      await UssdAutomationChannel.demarrerTransfertMtn(
-        numero: commande.destPhone,
-        montant: commande.montant,
-      );
-      setState(() => _idEnAttenteConfirmation = commande.id);
-      return;
-    }
-
-    final codeUssd =
-        operateur.construireCodeUssd(commande.destPhone, commande.montant);
-    final url = Uri.parse('tel:${Uri.encodeComponent(codeUssd)}');
-
-    if (await canLaunchUrl(url)) {
-      ajouterLog("Appel réseau ${operateur.nom} ($codeUssd)...");
-      await launchUrl(url);
-      setState(() => _idEnAttenteConfirmation = commande.id);
-    } else {
-      ajouterLog("⚠️ Échec : impossible d'accéder au clavier téléphonique.");
-      await _supabaseService.marquerStatut(commande.id, 'Échec');
-    }
+    // On ne pilote plus le composeur nous-mêmes : on envoie une notification
+    // structurée que MacroDroid lit et utilise pour lancer le transfert USSD.
+    const reseauActuel = 'MTN'; // seul réseau géré pour l'instant
+    ajouterLog(
+        "🤖 Commande transmise à MacroDroid : ${commande.destPhone} | $reseauActuel | ${commande.montant} F.");
+    await NotificationService.envoyerCommandePourMacroDroid(
+      id: commande.id,
+      numero: commande.destPhone,
+      operateur: reseauActuel,
+      montant: commande.montant,
+    );
+    setState(() => _idEnAttenteConfirmation = commande.id);
   }
 
   Future<void> _confirmerTransfertEffectue() async {
@@ -169,13 +155,6 @@ class _RobotTransfertScreenState extends State<RobotTransfertScreen> {
         ),
         backgroundColor: Colors.amber,
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.accessibility_new, color: Colors.black),
-            tooltip: "Activer l'automatisation USSD",
-            onPressed: UssdAutomationChannel.ouvrirParametresAccessibilite,
-          ),
-        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
