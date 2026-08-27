@@ -1,0 +1,102 @@
+import 'dart:io';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'notification_service.dart';
+
+/// Point d'entrée du service en arrière-plan. Tourne dans un isolate séparé
+/// de l'interface — c'est ce qui lui permet de survivre à la mise en veille
+/// de l'écran et au passage de l'app en arrière-plan.
+@pragma('vm:entry-point')
+void demarrerServiceArrierePlan() {
+  FlutterForegroundTask.setTaskHandler(MakbineTaskHandler());
+}
+
+class MakbineTaskHandler extends TaskHandler {
+  bool _supabasePret = false;
+  int _erreursConsecutives = 0;
+
+  Future<void> _assurerSupabaseInitialise() async {
+    if (_supabasePret) return;
+    // Cet isolate est indépendant de l'app principale : Supabase doit être
+    // réinitialisé ici avec les mêmes identifiants.
+    await Supabase.initialize(
+      url: 'https://vxaqlbaqfpxitbdimeqj.supabase.co',
+      anonKey:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4YXFsYmFxZnB4aXRiZGltZXFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyNjQ3NjAsImV4cCI6MjEwMTg0MDc2MH0.izqAjAoKSz_ecnuppy1XEcJWcsvDc-wwoJqdUR8coDI',
+    );
+    await NotificationService.initialiser();
+    _supabasePret = true;
+  }
+
+  @override
+  Future<void> onStart(DateTime timestamp, TaskStarter starter) async {
+    await _assurerSupabaseInitialise();
+    _envoyerLog("Service en arrière-plan démarré. Écoute de makbine.ci...");
+  }
+
+  @override
+  void onRepeatEvent(DateTime timestamp) {
+    _cycleDeVerification();
+  }
+
+  Future<void> _cycleDeVerification() async {
+    _envoyerLog("Scan de la table transactions...");
+    try {
+      final response = await Supabase.instance.client
+          .from('transactions')
+          .select()
+          .eq('status', 'En attente')
+          .order('created_at', ascending: false)
+          .limit(1);
+
+      _erreursConsecutives = 0;
+
+      if (response.isEmpty) {
+        _envoyerLog("Rien à signaler. En attente de paiement client...");
+        return;
+      }
+
+      final commande = response.first;
+      final id = commande['id'].toString();
+      final numero = commande['dest_phone'].toString();
+      final montant = commande['amount'].toString();
+      const reseauActuel = 'MTN';
+
+      _envoyerLog("🔥 COMMANDE DÉTECTÉE ! Client: $numero | $montant F");
+
+      await Supabase.instance.client
+          .from('transactions')
+          .update({'status': 'En cours'}).eq('id', id);
+
+      await NotificationService.envoyerCommandePourMacroDroid(
+        id: id,
+        numero: numero,
+        operateur: reseauActuel,
+        montant: montant,
+      );
+
+      _envoyerLog("🤖 Commande transmise à MacroDroid : $numero | $reseauActuel | $montant F.");
+    } on SocketException {
+      _erreursConsecutives++;
+      _envoyerLog("⚠️ Problème réseau temporaire (tentative $_erreursConsecutives).");
+    } catch (e) {
+      _envoyerLog("❌ Erreur inattendue : $e");
+    }
+  }
+
+  void _envoyerLog(String message) {
+    // Transmet le message à l'écran principal, où qu'il soit affiché.
+    FlutterForegroundTask.sendDataToMain(message);
+  }
+
+  @override
+  void onNotificationButtonPressed(String id) {}
+
+  @override
+  void onNotificationPressed() {
+    FlutterForegroundTask.launchApp();
+  }
+
+  @override
+  Future<void> onDestroy(DateTime timestamp) async {}
+}
