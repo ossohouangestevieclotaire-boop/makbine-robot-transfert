@@ -39,9 +39,12 @@ workflows:
             sed -i '' '/compileOptions {/a\
                     isCoreLibraryDesugaringEnabled = true
             ' android/app/build.gradle.kts
-            sed -i '' '/dependencies {/a\
-                coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-            ' android/app/build.gradle.kts
+            {
+              echo ""
+              echo "dependencies {"
+              echo "    coreLibraryDesugaring(\"com.android.tools:desugar_jdk_libs:2.1.4\")"
+              echo "}"
+            } >> android/app/build.gradle.kts
             echo "----- build.gradle.kts après modification -----"
             cat android/app/build.gradle.kts
           else
@@ -49,9 +52,12 @@ workflows:
             sed -i '' '/compileOptions {/a\
                     coreLibraryDesugaringEnabled true
             ' android/app/build.gradle
-            sed -i '' '/dependencies {/a\
-                coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.1.4"
-            ' android/app/build.gradle
+            {
+              echo ""
+              echo "dependencies {"
+              echo "    coreLibraryDesugaring \"com.android.tools:desugar_jdk_libs:2.1.4\""
+              echo "}"
+            } >> android/app/build.gradle
             echo "----- build.gradle après modification -----"
             cat android/app/build.gradle
           fi
